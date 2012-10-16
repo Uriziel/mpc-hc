@@ -14773,6 +14773,52 @@ void CMainFrame::SetClosedCaptions(bool enable)
     }
 }
 
+void CMainFrame::SetPlayingRate(float rate)
+{
+    if (m_iMediaLoadState != MLS_LOADED) {
+        return;
+    }
+
+    HRESULT hr = E_FAIL;
+    int iNewSpeedLevel = 0;
+    if(rate < 0){
+        iNewSpeedLevel = floor(log(rate) / log(2.0)); // This is log2(rate), microsoft forgot to include it in math.h
+    } else {
+        iNewSpeedLevel = ceil(log(rate) / log(2.0));
+    }
+
+    // Cap the max FFWD and RWD rates to 128x.
+    if(iNewSpeedLevel > 7 || iNewSpeedLevel < -7){ 
+        return;
+    }
+    
+    if (GetMediaState() != State_Running) {
+        SendMessage(WM_COMMAND, ID_PLAY_PLAY);
+    }
+    if (GetPlaybackMode() == PM_FILE) {
+        if (fabs(rate - 1.0) < 0.01) {
+            rate = 1.0;
+        }
+        hr = pMS->SetRate(rate);
+    } else if (GetPlaybackMode() == PM_DVD) {
+        rate = fabs(rate);
+        if (iNewSpeedLevel >= 0) {
+            hr = pDVDC->PlayForwards(rate, DVD_CMD_FLAG_Block, NULL);
+        } else {
+            hr = pDVDC->PlayBackwards(rate, DVD_CMD_FLAG_Block, NULL);
+        }
+    }
+
+    if (SUCCEEDED(hr)) {
+        m_iSpeedLevel = iNewSpeedLevel;
+        m_dSpeedRate = rate;
+
+        CString strODSMessage;
+        strODSMessage.Format(IDS_OSD_SPEED, (iNewSpeedLevel < 0 && GetPlaybackMode() == PM_DVD) ? -rate : rate);
+        m_OSD.DisplayMessage(OSD_TOPRIGHT, strODSMessage);
+    }
+}
+
 LPCTSTR CMainFrame::GetDVDAudioFormatName(DVD_AudioAttributes& ATR) const
 {
     switch (ATR.AudioFormat) {
@@ -14995,6 +15041,9 @@ void CMainFrame::ProcessAPICommand(COPYDATASTRUCT* pCDS)
             break;
         case CMD_CLOSEAPP:
             PostMessage(WM_CLOSE);
+            break;
+        case CMD_SETSPEED:
+            SetPlayingRate(_wtof((LPCWSTR)pCDS->lpData));
             break;
         case CMD_OSDSHOWMESSAGE:
             ShowOSDCustomMessageApi((MPC_OSDDATA*)pCDS->lpData);

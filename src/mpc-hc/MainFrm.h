@@ -431,7 +431,7 @@ public:
     REFERENCE_TIME GetPos() const;
     REFERENCE_TIME GetDur() const;
     void SeekTo(REFERENCE_TIME rt, bool fSeekToKeyFrame = false);
-
+    void SetPlayingRate(float rate);
     // audio streams order functions
     void InsertAudioStream(const CComQIPtr<IAMStreamSelect>& pSS, int i);
     void SetupAudioStreams();
